@@ -1,7 +1,7 @@
 package com.vn.restaurant.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.vn.restaurant.dto.ApiResponse;
+import com.vn.restaurant.dto.ApiRes;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpStatus;
@@ -29,6 +29,7 @@ public class SecurityConfig {
             "/swagger-ui.html",
             "/api/v1/auth/login",
             "/api/v1/auth/refresh",
+            "/api/v1/auth/logout",
             "/uploads/**"
     };
 
@@ -60,7 +61,7 @@ public class SecurityConfig {
             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
             response.setCharacterEncoding("UTF-8");
 
-            ApiResponse<Void> body = ApiResponse.unauthorized("Token không hợp lệ hoặc đã hết hạn");
+            ApiRes<Void> body = ApiRes.unauthorized("Token không hợp lệ hoặc đã hết hạn");
             response.getWriter().write(objectMapper.writeValueAsString(body));
         };
     }
@@ -72,7 +73,7 @@ public class SecurityConfig {
             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
             response.setCharacterEncoding("UTF-8");
 
-            ApiResponse<Void> body = ApiResponse.forbidden("Bạn không có quyền truy cập tài nguyên này");
+            ApiRes<Void> body = ApiRes.forbidden("Bạn không có quyền truy cập tài nguyên này");
             response.getWriter().write(objectMapper.writeValueAsString(body));
         };
     }

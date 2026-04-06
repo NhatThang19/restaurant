@@ -21,4 +21,3 @@ jwt:
   secret: 0123456789abcdef0123456789abcdef
   access-token-expiration: 900000 # 15 phút
   refresh-expiration: 259200000 # 3 ngày
-  cookie-secure: false

@@ -1,16 +1,16 @@
 package com.vn.restaurant.features.auth.service;
 
-import com.vn.restaurant.features.auth.dto.req.LoginRequest;
-import com.vn.restaurant.features.auth.dto.res.LoginResponse;
-import com.vn.restaurant.features.auth.dto.res.MeResponse;
+import com.vn.restaurant.features.auth.dto.req.LoginReq;
+import com.vn.restaurant.features.auth.dto.res.LoginRes;
+import com.vn.restaurant.features.auth.dto.res.MeRes;
 
 public interface AuthService {
 
-    LoginResponse login(LoginRequest request, String userAgent, String ipAddress);
+    LoginRes login(LoginReq request, String userAgent, String ipAddress);
 
-    LoginResponse refresh(String rawRefreshToken, String userAgent, String ipAddress);
+    LoginRes refresh(String rawRefreshToken, String userAgent, String ipAddress);
 
     void logout(String rawRefreshToken);
 
-    MeResponse getMe(String username);
+    MeRes getMe(String username);
 }

@@ -1,19 +1,14 @@
 package com.vn.restaurant.features.auth.controller;
 
-import com.vn.restaurant.dto.ApiResponse;
+import com.vn.restaurant.dto.ApiRes;
 import com.vn.restaurant.exception.InvalidTokenException;
-import com.vn.restaurant.features.auth.dto.req.LoginRequest;
-import com.vn.restaurant.features.auth.dto.req.RefreshRequest;
-import com.vn.restaurant.features.auth.dto.res.LoginResponse;
-import com.vn.restaurant.features.auth.dto.res.MeResponse;
+import com.vn.restaurant.features.auth.dto.req.LoginReq;
+import com.vn.restaurant.features.auth.dto.req.RefreshReq;
+import com.vn.restaurant.features.auth.dto.res.LoginRes;
+import com.vn.restaurant.features.auth.dto.res.MeRes;
 import com.vn.restaurant.features.auth.service.AuthService;
-import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
-import java.util.Arrays;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -27,43 +22,30 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/auth")
 public class AuthController {
 
-    private static final String REFRESH_TOKEN_COOKIE_NAME = "refresh_token";
-    private static final String COOKIE_PATH = "/api/v1/auth";
-
     private final AuthService authService;
-
-    @Value("${jwt.refresh-expiration:259200000}")
-    private long refreshTokenExpiration;
-
-    @Value("${jwt.cookie-secure:false}")
-    private boolean cookieSecure;
 
     public AuthController(AuthService authService) {
         this.authService = authService;
     }
 
     @PostMapping("/login")
-    public ResponseEntity<ApiResponse<LoginResponse>> login(
-            @Valid @RequestBody LoginRequest request,
-            HttpServletRequest httpRequest,
-            HttpServletResponse httpResponse) {
+    public ResponseEntity<ApiRes<LoginRes>> login(
+            @Valid @RequestBody LoginReq request,
+            HttpServletRequest httpRequest) {
 
         String userAgent = httpRequest.getHeader("User-Agent");
         String ipAddress = extractClientIp(httpRequest);
 
-        LoginResponse loginResponse = authService.login(request, userAgent, ipAddress);
-        setRefreshTokenCookie(httpResponse, loginResponse.refreshToken());
-
-        return ResponseEntity.ok(ApiResponse.success("Đăng nhập thành công", loginResponse));
+        LoginRes loginRes = authService.login(request, userAgent, ipAddress);
+        return ResponseEntity.ok(ApiRes.success("Đăng nhập thành công", loginRes));
     }
 
     @PostMapping("/refresh")
-    public ResponseEntity<ApiResponse<LoginResponse>> refresh(
-            @RequestBody(required = false) RefreshRequest body,
-            HttpServletRequest httpRequest,
-            HttpServletResponse httpResponse) {
+    public ResponseEntity<ApiRes<LoginRes>> refresh(
+            @RequestBody(required = false) RefreshReq body,
+            HttpServletRequest httpRequest) {
 
-        String rawRefreshToken = extractRefreshToken(body, httpRequest);
+        String rawRefreshToken = extractRefreshToken(body);
         if (rawRefreshToken == null) {
             throw new InvalidTokenException("Refresh token không được cung cấp");
         }
@@ -71,78 +53,37 @@ public class AuthController {
         String userAgent = httpRequest.getHeader("User-Agent");
         String ipAddress = extractClientIp(httpRequest);
 
-        LoginResponse loginResponse = authService.refresh(rawRefreshToken, userAgent, ipAddress);
-        setRefreshTokenCookie(httpResponse, loginResponse.refreshToken());
-
-        return ResponseEntity.ok(ApiResponse.success("Token đã được làm mới", loginResponse));
+        LoginRes loginRes = authService.refresh(rawRefreshToken, userAgent, ipAddress);
+        return ResponseEntity.ok(ApiRes.success("Token đã được làm mới", loginRes));
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<ApiResponse<Void>> logout(HttpServletRequest httpRequest, HttpServletResponse httpResponse) {
-        String rawRefreshToken = extractRefreshTokenFromCookie(httpRequest);
-        if (rawRefreshToken != null) {
-            authService.logout(rawRefreshToken);
+    public ResponseEntity<ApiRes<Void>> logout(@RequestBody(required = false) RefreshReq body) {
+        String rawRefreshToken = extractRefreshToken(body);
+        if (rawRefreshToken == null) {
+            throw new InvalidTokenException("Refresh token không được cung cấp");
         }
 
-        clearRefreshTokenCookie(httpResponse);
-        return ResponseEntity.ok(ApiResponse.success("Đăng xuất thành công", null));
+        authService.logout(rawRefreshToken);
+        return ResponseEntity.ok(ApiRes.success("Đăng xuất thành công", null));
     }
 
     @GetMapping("/me")
-    public ResponseEntity<ApiResponse<MeResponse>> getMe(@AuthenticationPrincipal Jwt jwt) {
-        MeResponse response = authService.getMe(jwt.getSubject());
-        return ResponseEntity.ok(ApiResponse.success(response));
-    }
-
-    private String extractRefreshToken(RefreshRequest body, HttpServletRequest request) {
-        String fromCookie = extractRefreshTokenFromCookie(request);
-        if (fromCookie != null) {
-            return fromCookie;
+    public ResponseEntity<ApiRes<MeRes>> getMe(@AuthenticationPrincipal Jwt jwt) {
+        String tokenType = jwt.getClaimAsString("type");
+        if (!"access".equals(tokenType)) {
+            throw new InvalidTokenException("Token không phải access token");
         }
 
+        MeRes response = authService.getMe(jwt.getSubject());
+        return ResponseEntity.ok(ApiRes.success(response));
+    }
+
+    private String extractRefreshToken(RefreshReq body) {
         if (body != null && body.refreshToken() != null && !body.refreshToken().isBlank()) {
             return body.refreshToken();
         }
-
         return null;
-    }
-
-    private String extractRefreshTokenFromCookie(HttpServletRequest request) {
-        if (request.getCookies() == null) {
-            return null;
-        }
-
-        return Arrays.stream(request.getCookies())
-                .filter(cookie -> REFRESH_TOKEN_COOKIE_NAME.equals(cookie.getName()))
-                .map(Cookie::getValue)
-                .findFirst()
-                .orElse(null);
-    }
-
-    private void setRefreshTokenCookie(HttpServletResponse response, String rawToken) {
-        long maxAgeSeconds = refreshTokenExpiration / 1000;
-
-        ResponseCookie cookie = ResponseCookie.from(REFRESH_TOKEN_COOKIE_NAME, rawToken)
-                .httpOnly(true)
-                .secure(cookieSecure)
-                .sameSite("Lax")
-                .path(COOKIE_PATH)
-                .maxAge(maxAgeSeconds)
-                .build();
-
-        response.addHeader("Set-Cookie", cookie.toString());
-    }
-
-    private void clearRefreshTokenCookie(HttpServletResponse response) {
-        ResponseCookie cookie = ResponseCookie.from(REFRESH_TOKEN_COOKIE_NAME, "")
-                .httpOnly(true)
-                .secure(cookieSecure)
-                .sameSite("Lax")
-                .path(COOKIE_PATH)
-                .maxAge(0)
-                .build();
-
-        response.addHeader("Set-Cookie", cookie.toString());
     }
 
     private String extractClientIp(HttpServletRequest request) {

@@ -2,9 +2,9 @@ package com.vn.restaurant.features.auth.service;
 
 import com.vn.restaurant.exception.InvalidTokenException;
 import com.vn.restaurant.exception.ResourceNotFoundException;
-import com.vn.restaurant.features.auth.dto.req.LoginRequest;
-import com.vn.restaurant.features.auth.dto.res.LoginResponse;
-import com.vn.restaurant.features.auth.dto.res.MeResponse;
+import com.vn.restaurant.features.auth.dto.req.LoginReq;
+import com.vn.restaurant.features.auth.dto.res.LoginRes;
+import com.vn.restaurant.features.auth.dto.res.MeRes;
 import com.vn.restaurant.features.auth.model.RefreshToken;
 import com.vn.restaurant.features.auth.repository.RefreshTokenRepository;
 import com.vn.restaurant.features.identity.model.User;
@@ -23,8 +23,10 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.JwsHeader;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
+import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,44 +35,48 @@ public class AuthServiceImpl implements AuthService {
 
     private final AuthenticationManager authenticationManager;
     private final JwtEncoder jwtEncoder;
+    private final JwtDecoder jwtDecoder;
     private final UserRepository userRepository;
     private final RefreshTokenRepository refreshTokenRepository;
 
-    @Value("${jwt.access-token-expiration:900000}")
+    @Value("${jwt.access-token-expiration}")
     private long accessTokenExpiration;
 
-    @Value("${jwt.refresh-expiration:259200000}")
+    @Value("${jwt.refresh-expiration}")
     private long refreshTokenExpiration;
 
     public AuthServiceImpl(AuthenticationManager authenticationManager,
             JwtEncoder jwtEncoder,
+            JwtDecoder jwtDecoder,
             UserRepository userRepository,
             RefreshTokenRepository refreshTokenRepository) {
         this.authenticationManager = authenticationManager;
         this.jwtEncoder = jwtEncoder;
+        this.jwtDecoder = jwtDecoder;
         this.userRepository = userRepository;
         this.refreshTokenRepository = refreshTokenRepository;
     }
 
     @Override
     @Transactional
-    public LoginResponse login(LoginRequest request, String userAgent, String ipAddress) {
+    public LoginRes login(LoginReq request, String userAgent, String ipAddress) {
         Authentication authentication = authenticationManager.authenticate(
                 UsernamePasswordAuthenticationToken.unauthenticated(request.username(), request.password()));
 
         User user = userRepository.findByUsername(request.username())
-                .orElseThrow(() -> new ResourceNotFoundException("Nguoi dung", "username", request.username()));
+                .orElseThrow(() -> new ResourceNotFoundException("Người dùng", "username", request.username()));
 
         String accessToken = generateAccessToken(authentication.getName(), user);
         String refreshToken = generateRefreshToken(authentication.getName(), user);
         saveRefreshToken(refreshToken, user, userAgent, ipAddress);
 
-        return new LoginResponse(accessToken, refreshToken);
+        return new LoginRes(accessToken, refreshToken);
     }
 
     @Override
     @Transactional
-    public LoginResponse refresh(String rawRefreshToken, String userAgent, String ipAddress) {
+    public LoginRes refresh(String rawRefreshToken, String userAgent, String ipAddress) {
+        validateRefreshToken(rawRefreshToken);
         String tokenHash = hashToken(rawRefreshToken);
 
         RefreshToken storedToken = refreshTokenRepository.findByTokenAndRevokedAtIsNull(tokenHash)
@@ -90,32 +96,46 @@ public class AuthServiceImpl implements AuthService {
         String refreshToken = generateRefreshToken(username, user);
         saveRefreshToken(refreshToken, user, userAgent, ipAddress);
 
-        return new LoginResponse(accessToken, refreshToken);
+        return new LoginRes(accessToken, refreshToken);
     }
 
     @Override
     @Transactional
     public void logout(String rawRefreshToken) {
+        validateRefreshToken(rawRefreshToken);
         String tokenHash = hashToken(rawRefreshToken);
-        refreshTokenRepository.findByTokenAndRevokedAtIsNull(tokenHash)
-                .ifPresent(token -> {
-                    token.setRevokedAt(Instant.now());
-                    refreshTokenRepository.save(token);
-                });
+
+        RefreshToken storedToken = refreshTokenRepository.findByTokenAndRevokedAtIsNull(tokenHash)
+                .orElseThrow(() -> new InvalidTokenException("Refresh token không hợp lệ"));
+
+        if (storedToken.getExpiresAt().isBefore(Instant.now())) {
+            throw new InvalidTokenException("Refresh token đã hết hạn");
+        }
+
+        storedToken.setRevokedAt(Instant.now());
+        refreshTokenRepository.save(storedToken);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public MeResponse getMe(String username) {
+    public MeRes getMe(String username) {
         User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new ResourceNotFoundException("Nguoi dung", "username", username));
+                .orElseThrow(() -> new ResourceNotFoundException("Người dùng", "username", username));
 
-        return new MeResponse(
-                user.getId(),
-                user.getUsername(),
-                user.getFullName(),
-                user.getRole().getName().name(),
-                user.getStatus());
+        return MeRes.builder()
+                .id(user.getId())
+                .username(user.getUsername())
+                .fullName(user.getFullName())
+                .phone(user.getPhone())
+                .email(user.getEmail())
+                .address(user.getAddress())
+                .dateOfBirth(user.getDateOfBirth())
+                .gender(user.getGender())
+                .hireDate(user.getHireDate())
+                .citizenId(user.getCitizenId())
+                .role(user.getRole().getName().name())
+                .status(user.getStatus())
+                .build();
     }
 
     private String generateAccessToken(String username, User user) {
@@ -128,6 +148,7 @@ public class AuthServiceImpl implements AuthService {
                 .expiresAt(now.plusMillis(accessTokenExpiration))
                 .claim("userId", user.getId())
                 .claim("roles", roles)
+                .claim("type", "access")
                 .build();
 
         JwsHeader header = JwsHeader.with(MacAlgorithm.HS256).build();
@@ -169,6 +190,17 @@ public class AuthServiceImpl implements AuthService {
             return HexFormat.of().formatHex(hashBytes);
         } catch (NoSuchAlgorithmException ex) {
             throw new RuntimeException("Không thể hash refresh token", ex);
+        }
+    }
+
+    private void validateRefreshToken(String rawRefreshToken) {
+        try {
+            String tokenType = jwtDecoder.decode(rawRefreshToken).getClaimAsString("type");
+            if (!"refresh".equals(tokenType)) {
+                throw new InvalidTokenException("Token không phải refresh token");
+            }
+        } catch (JwtException ex) {
+            throw new InvalidTokenException("Refresh token không hợp lệ");
         }
     }
 }
