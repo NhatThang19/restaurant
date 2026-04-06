@@ -9,6 +9,8 @@ import com.vn.restaurant.features.identity.repository.RoleRepository;
 import com.vn.restaurant.features.identity.service.UserService;
 import java.time.LocalDate;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -18,6 +20,8 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 @RequiredArgsConstructor
 public class IdentitySeeder {
 
+    private static final Logger log = LoggerFactory.getLogger(IdentitySeeder.class);
+
     private final RoleRepository roleRepository;
     private final UserService userService;
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
@@ -25,6 +29,7 @@ public class IdentitySeeder {
     @Bean
     CommandLineRunner seedDefaultAccounts() {
         return args -> {
+            log.info("Bắt đầu khởi tạo dữ liệu định danh mặc định (roles/users)");
             Role managerRole = getOrCreateRole(RoleNameEnum.MANAGER);
             Role waiterRole = getOrCreateRole(RoleNameEnum.WAITER);
             Role cashierRole = getOrCreateRole(RoleNameEnum.CASHIER);
@@ -74,12 +79,20 @@ public class IdentitySeeder {
                     LocalDate.of(2020, 11, 15),
                     "079090000004",
                     kitchenRole);
+            log.info("Hoàn tất khởi tạo dữ liệu định danh mặc định");
         };
     }
 
     private Role getOrCreateRole(RoleNameEnum roleName) {
         return roleRepository.findByName(roleName)
-                .orElseGet(() -> roleRepository.save(Role.builder().name(roleName).build()));
+                .map(existingRole -> {
+                    log.info("Role '{}' đã tồn tại, bỏ qua tạo mới", roleName);
+                    return existingRole;
+                })
+                .orElseGet(() -> {
+                    log.info("Đang tạo role mới '{}'", roleName);
+                    return roleRepository.save(Role.builder().name(roleName).build());
+                });
     }
 
     private void createUserIfMissing(
@@ -94,9 +107,11 @@ public class IdentitySeeder {
             String citizenId,
             Role role) {
         if (userService.existsByUsername(username)) {
+            log.info("Tài khoản '{}' đã tồn tại, bỏ qua tạo mới", username);
             return;
         }
 
+        log.info("Đang tạo tài khoản mặc định '{}' với role '{}'", username, role.getName());
         User user = User.builder()
                 .username(username)
                 .password(passwordEncoder.encode("123456"))
@@ -112,5 +127,6 @@ public class IdentitySeeder {
                 .status(UserStatusEnum.ACTIVE)
                 .build();
         userService.save(user);
+        log.info("Đã tạo tài khoản '{}' thành công", username);
     }
 }
