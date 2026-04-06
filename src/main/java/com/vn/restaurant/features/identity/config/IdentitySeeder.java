@@ -6,7 +6,7 @@ import com.vn.restaurant.features.common.enums.UserStatusEnum;
 import com.vn.restaurant.features.identity.model.Role;
 import com.vn.restaurant.features.identity.model.User;
 import com.vn.restaurant.features.identity.repository.RoleRepository;
-import com.vn.restaurant.features.identity.repository.UserRepository;
+import com.vn.restaurant.features.identity.service.UserService;
 import java.time.LocalDate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.CommandLineRunner;
@@ -19,7 +19,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 public class IdentitySeeder {
 
     private final RoleRepository roleRepository;
-    private final UserRepository userRepository;
+    private final UserService userService;
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     @Bean
@@ -93,7 +93,7 @@ public class IdentitySeeder {
             LocalDate hireDate,
             String citizenId,
             Role role) {
-        if (userRepository.existsByUsername(username)) {
+        if (userService.existsByUsername(username)) {
             return;
         }
 
@@ -111,6 +111,6 @@ public class IdentitySeeder {
                 .role(role)
                 .status(UserStatusEnum.ACTIVE)
                 .build();
-        userRepository.save(user);
+        userService.save(user);
     }
 }

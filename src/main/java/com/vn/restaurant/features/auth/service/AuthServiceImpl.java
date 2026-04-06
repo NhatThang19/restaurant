@@ -1,14 +1,16 @@
 package com.vn.restaurant.features.auth.service;
 
 import com.vn.restaurant.exception.InvalidTokenException;
-import com.vn.restaurant.exception.ResourceNotFoundException;
 import com.vn.restaurant.features.auth.dto.req.LoginReq;
 import com.vn.restaurant.features.auth.dto.res.LoginRes;
 import com.vn.restaurant.features.auth.dto.res.MeRes;
 import com.vn.restaurant.features.auth.model.RefreshToken;
 import com.vn.restaurant.features.auth.repository.RefreshTokenRepository;
 import com.vn.restaurant.features.identity.model.User;
-import com.vn.restaurant.features.identity.repository.UserRepository;
+import com.vn.restaurant.features.identity.service.UserService;
+
+import lombok.RequiredArgsConstructor;
+
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -31,12 +33,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class AuthServiceImpl implements AuthService {
 
     private final AuthenticationManager authenticationManager;
     private final JwtEncoder jwtEncoder;
     private final JwtDecoder jwtDecoder;
-    private final UserRepository userRepository;
+    private final UserService userService;
     private final RefreshTokenRepository refreshTokenRepository;
 
     @Value("${jwt.access-token-expiration}")
@@ -45,26 +48,13 @@ public class AuthServiceImpl implements AuthService {
     @Value("${jwt.refresh-expiration}")
     private long refreshTokenExpiration;
 
-    public AuthServiceImpl(AuthenticationManager authenticationManager,
-            JwtEncoder jwtEncoder,
-            JwtDecoder jwtDecoder,
-            UserRepository userRepository,
-            RefreshTokenRepository refreshTokenRepository) {
-        this.authenticationManager = authenticationManager;
-        this.jwtEncoder = jwtEncoder;
-        this.jwtDecoder = jwtDecoder;
-        this.userRepository = userRepository;
-        this.refreshTokenRepository = refreshTokenRepository;
-    }
-
     @Override
     @Transactional
     public LoginRes login(LoginReq request, String userAgent, String ipAddress) {
         Authentication authentication = authenticationManager.authenticate(
                 UsernamePasswordAuthenticationToken.unauthenticated(request.username(), request.password()));
 
-        User user = userRepository.findByUsername(request.username())
-                .orElseThrow(() -> new ResourceNotFoundException("Người dùng", "username", request.username()));
+        User user = userService.getByUsernameOrThrow(request.username());
 
         String accessToken = generateAccessToken(authentication.getName(), user);
         String refreshToken = generateRefreshToken(authentication.getName(), user);
@@ -119,8 +109,7 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional(readOnly = true)
     public MeRes getMe(String username) {
-        User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new ResourceNotFoundException("Người dùng", "username", username));
+        User user = userService.getByUsernameOrThrow(username);
 
         return MeRes.builder()
                 .id(user.getId())
@@ -197,7 +186,7 @@ public class AuthServiceImpl implements AuthService {
         try {
             String tokenType = jwtDecoder.decode(rawRefreshToken).getClaimAsString("type");
             if (!"refresh".equals(tokenType)) {
-                throw new InvalidTokenException("Token không phải refresh token");
+                throw new InvalidTokenException("Token không phải là refresh token");
             }
         } catch (JwtException ex) {
             throw new InvalidTokenException("Refresh token không hợp lệ");
