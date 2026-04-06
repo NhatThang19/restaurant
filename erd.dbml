@@ -1,0 +1,65 @@
+﻿Enum role_name_enum {
+  MANAGER
+  WAITER
+  CASHIER
+  KITCHEN
+}
+
+Enum user_status_enum {
+  ACTIVE
+  LOCKED
+}
+
+Enum gender_enum {
+  MALE
+  FEMALE
+}
+
+Table roles {
+  id int [pk, increment]
+  name role_name_enum [not null, unique]
+}
+
+Table users {
+  id int [pk, increment]
+  username varchar(100) [not null, unique]
+  password varchar(255) [not null]
+  full_name varchar(150) [not null]
+  phone varchar(20)
+  email varchar(150)
+  address varchar(255)
+  date_of_birth date
+  gender gender_enum
+  hire_date date
+  citizen_id varchar(20)
+  role_id int [not null, ref: > roles.id]
+  status user_status_enum [not null, default: 'ACTIVE']
+  created_at datetime [not null]
+  updated_at datetime
+  created_by int
+  updated_by int
+
+  indexes {
+    role_id [name: 'idx_users_role_id']
+    status [name: 'idx_users_status']
+  }
+}
+
+Table refresh_tokens {
+  id int [pk, increment]
+  user_id int [not null, ref: > users.id]
+  token varchar(255) [not null, unique]
+  issued_at datetime [not null] // Thời điểm phát hành
+  expires_at datetime [not null] // Thời điểm hết hạn
+  revoked_at datetime // Thời điểm bị thu hồi
+  device_id varchar(120) // Mã định danh thiết bị
+  ip_address varchar(45) // Địa chỉ IP
+  user_agent varchar(255) // Thông tin môi trường
+  created_at datetime [not null]
+
+  indexes {
+    user_id [name: 'idx_refresh_tokens_user_id']
+    expires_at [name: 'idx_refresh_tokens_expires_at']
+    (user_id, revoked_at) [name: 'idx_refresh_tokens_user_revoked']
+  }
+}
