@@ -1,7 +1,7 @@
 package com.vn.restaurant.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import java.util.List;
+import java.util.Map;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record ApiRes<T>(
@@ -9,11 +9,7 @@ public record ApiRes<T>(
         String message,
         T data,
         String error,
-        List<FieldError> details) {
-
-    public record FieldError(String field, String message) {
-    }
-
+        Map<String, String> details) {
     // Success responses
     public static <T> ApiRes<T> success(T data) {
         return new ApiRes<>(200, "Thành công", data, null, null);
@@ -36,7 +32,7 @@ public record ApiRes<T>(
         return new ApiRes<>(400, message, null, "Yêu cầu không hợp lệ", null);
     }
 
-    public static <T> ApiRes<T> badRequest(String message, List<FieldError> details) {
+    public static <T> ApiRes<T> badRequest(String message, Map<String, String> details) {
         return new ApiRes<>(400, message, null, "Yêu cầu không hợp lệ", details);
     }
 

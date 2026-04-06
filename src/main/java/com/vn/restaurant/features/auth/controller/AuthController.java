@@ -57,12 +57,10 @@ public class AuthController {
                       "message": "Dữ liệu không hợp lệ",
                       "data": null,
                       "error": "Yêu cầu không hợp lệ",
-                      "details": [
-                        {
-                          "field": "username",
-                          "message": "Tên đăng nhập không được để trống"
-                        }
-                      ]
+                      "details": {
+                        "username": "Tên đăng nhập không được để trống",
+                        "password": "Mật khẩu không được để trống"
+                      }
                     }
                     """))),
             @ApiResponse(responseCode = "401", description = "Sai thông tin đăng nhập", content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ApiRes.class), examples = @ExampleObject(name = "unauthorized", value = """

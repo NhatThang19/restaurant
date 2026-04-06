@@ -3,14 +3,15 @@ package com.vn.restaurant.exception;
 import com.vn.restaurant.dto.ApiRes;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
-import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.security.core.AuthenticationException;
-import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -32,9 +33,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiRes<Void>> handleValidation(MethodArgumentNotValidException ex,
             HttpServletRequest request) {
-        List<ApiRes.FieldError> details = ex.getBindingResult().getFieldErrors().stream()
-                .map(this::mapFieldError)
-                .toList();
+        Map<String, String> details = ex.getBindingResult().getFieldErrors().stream()
+                .collect(Collectors.toMap(
+                        org.springframework.validation.FieldError::getField,
+                        error -> getValidationMessage(error.getDefaultMessage()),
+                        (existing, ignored) -> existing,
+                        LinkedHashMap::new));
 
         log.warn("Lỗi xác thực dữ liệu tại {} {} | chi tiết lỗi={}",
                 request.getMethod(), request.getRequestURI(), details);
@@ -46,10 +50,17 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ConstraintViolationException.class)
     public ResponseEntity<ApiRes<Void>> handleConstraintViolation(ConstraintViolationException ex,
             HttpServletRequest request) {
-        log.warn("Lỗi vi phạm ràng buộc tại {} {} | thông báo={}",
-                request.getMethod(), request.getRequestURI(), ex.getMessage());
+        Map<String, String> details = ex.getConstraintViolations().stream()
+                .collect(Collectors.toMap(
+                        violation -> extractFieldName(violation.getPropertyPath().toString()),
+                        violation -> getValidationMessage(violation.getMessage()),
+                        (existing, ignored) -> existing,
+                        LinkedHashMap::new));
 
-        ApiRes<Void> body = ApiRes.badRequest(ex.getMessage());
+        log.warn("Lỗi vi phạm ràng buộc tại {} {} | chi tiết lỗi={}",
+                request.getMethod(), request.getRequestURI(), details);
+
+        ApiRes<Void> body = ApiRes.badRequest("Dữ liệu không hợp lệ", details);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
     }
 
@@ -70,8 +81,15 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);
     }
 
-    private ApiRes.FieldError mapFieldError(FieldError error) {
-        String message = error.getDefaultMessage() == null ? "Giá trị không hợp lệ" : error.getDefaultMessage();
-        return new ApiRes.FieldError(error.getField(), message);
+    private String getValidationMessage(String defaultMessage) {
+        return defaultMessage == null ? "Giá trị không hợp lệ" : defaultMessage;
+    }
+
+    private String extractFieldName(String propertyPath) {
+        if (propertyPath == null || propertyPath.isBlank()) {
+            return "unknown";
+        }
+        int lastDotIndex = propertyPath.lastIndexOf('.');
+        return lastDotIndex >= 0 ? propertyPath.substring(lastDotIndex + 1) : propertyPath;
     }
 }
