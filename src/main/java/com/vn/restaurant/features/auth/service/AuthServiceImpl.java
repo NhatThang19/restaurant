@@ -70,10 +70,10 @@ public class AuthServiceImpl implements AuthService {
         String tokenHash = hashToken(rawRefreshToken);
 
         RefreshToken storedToken = refreshTokenRepository.findByTokenAndRevokedAtIsNull(tokenHash)
-                .orElseThrow(() -> new InvalidTokenException("Refresh token không hợp lệ"));
+                .orElseThrow(() -> new InvalidTokenException("Refresh token khong hop le"));
 
         if (storedToken.getExpiresAt().isBefore(Instant.now())) {
-            throw new InvalidTokenException("Refresh token đã hết hạn");
+            throw new InvalidTokenException("Refresh token da het han");
         }
 
         storedToken.setRevokedAt(Instant.now());
@@ -96,10 +96,10 @@ public class AuthServiceImpl implements AuthService {
         String tokenHash = hashToken(rawRefreshToken);
 
         RefreshToken storedToken = refreshTokenRepository.findByTokenAndRevokedAtIsNull(tokenHash)
-                .orElseThrow(() -> new InvalidTokenException("Refresh token không hợp lệ"));
+                .orElseThrow(() -> new InvalidTokenException("Refresh token khong hop le"));
 
         if (storedToken.getExpiresAt().isBefore(Instant.now())) {
-            throw new InvalidTokenException("Refresh token đã hết hạn");
+            throw new InvalidTokenException("Refresh token da het han");
         }
 
         storedToken.setRevokedAt(Instant.now());
@@ -178,7 +178,7 @@ public class AuthServiceImpl implements AuthService {
             byte[] hashBytes = digest.digest(rawToken.getBytes(StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(hashBytes);
         } catch (NoSuchAlgorithmException ex) {
-            throw new RuntimeException("Không thể hash refresh token", ex);
+            throw new RuntimeException("Khong the hash refresh token", ex);
         }
     }
 
@@ -186,10 +186,10 @@ public class AuthServiceImpl implements AuthService {
         try {
             String tokenType = jwtDecoder.decode(rawRefreshToken).getClaimAsString("type");
             if (!"refresh".equals(tokenType)) {
-                throw new InvalidTokenException("Token không phải là refresh token");
+                throw new InvalidTokenException("Token khong phai la refresh token");
             }
         } catch (JwtException ex) {
-            throw new InvalidTokenException("Refresh token không hợp lệ");
+            throw new InvalidTokenException("Refresh token khong hop le");
         }
     }
 }

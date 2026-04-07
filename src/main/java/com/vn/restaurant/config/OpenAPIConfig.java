@@ -17,7 +17,7 @@ public class OpenAPIConfig {
                 .info(new Info()
                         .title("Restaurant Management API")
                         .version("1.0")
-                        .description("API tài liệu cho hệ thống quản lý nhà hàng"))
+                        .description("API tai lieu cho he thong quan ly nha hang"))
                 .addSecurityItem(new SecurityRequirement().addList("bearerAuth"))
                 .components(new Components()
                         .addSecuritySchemes("bearerAuth", new SecurityScheme()

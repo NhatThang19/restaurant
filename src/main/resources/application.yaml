@@ -17,6 +17,11 @@ spring:
         # "[format_sql]": true
     database-platform: org.hibernate.dialect.SQLServerDialect
 
+  data:
+    web:
+      pageable:
+        one-indexed-parameters: true
+
 jwt:
   secret: 0123456789abcdef0123456789abcdef
   access-token-expiration: 900000 # 15 phút

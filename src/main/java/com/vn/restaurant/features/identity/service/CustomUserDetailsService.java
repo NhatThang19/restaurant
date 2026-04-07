@@ -28,7 +28,7 @@ public class CustomUserDetailsService implements UserDetailsService {
         try {
             user = userService.getByUsernameOrThrow(username);
         } catch (ResourceNotFoundException ex) {
-            throw new UsernameNotFoundException("Không tìm thấy người dùng với tên đăng nhập: " + username, ex);
+            throw new UsernameNotFoundException("Khong tim thay nguoi dung voi ten dang nhap: " + username, ex);
         }
 
         List<GrantedAuthority> authorities = List.of(

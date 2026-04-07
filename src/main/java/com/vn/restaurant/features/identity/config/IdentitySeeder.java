@@ -29,7 +29,7 @@ public class IdentitySeeder {
     @Bean
     CommandLineRunner seedDefaultAccounts() {
         return args -> {
-            log.info("Bắt đầu khởi tạo dữ liệu định danh mặc định (roles/users)");
+            log.info("Bat dau khoi tao du lieu dinh danh mac dinh (roles/users)");
             Role managerRole = getOrCreateRole(RoleNameEnum.MANAGER);
             Role waiterRole = getOrCreateRole(RoleNameEnum.WAITER);
             Role cashierRole = getOrCreateRole(RoleNameEnum.CASHIER);
@@ -79,18 +79,18 @@ public class IdentitySeeder {
                     LocalDate.of(2020, 11, 15),
                     "079090000004",
                     kitchenRole);
-            log.info("Hoàn tất khởi tạo dữ liệu định danh mặc định");
+            log.info("Hoan tat khoi tao du lieu dinh danh mac dinh");
         };
     }
 
     private Role getOrCreateRole(RoleNameEnum roleName) {
         return roleRepository.findByName(roleName)
                 .map(existingRole -> {
-                    log.info("Role '{}' đã tồn tại, bỏ qua tạo mới", roleName);
+                    log.info("Role '{}' da ton tai, bo qua tao moi", roleName);
                     return existingRole;
                 })
                 .orElseGet(() -> {
-                    log.info("Đang tạo role mới '{}'", roleName);
+                    log.info("Dang tao role moi '{}'", roleName);
                     return roleRepository.save(Role.builder().name(roleName).build());
                 });
     }
@@ -107,11 +107,11 @@ public class IdentitySeeder {
             String citizenId,
             Role role) {
         if (userService.existsByUsername(username)) {
-            log.info("Tài khoản '{}' đã tồn tại, bỏ qua tạo mới", username);
+            log.info("Tai khoan '{}' da ton tai, bo qua tao moi", username);
             return;
         }
 
-        log.info("Đang tạo tài khoản mặc định '{}' với role '{}'", username, role.getName());
+        log.info("Dang tao tai khoan mac dinh '{}' voi role '{}'", username, role.getName());
         User user = User.builder()
                 .username(username)
                 .password(passwordEncoder.encode("123456"))
@@ -127,6 +127,6 @@ public class IdentitySeeder {
                 .status(UserStatusEnum.ACTIVE)
                 .build();
         userService.save(user);
-        log.info("Đã tạo tài khoản '{}' thành công", username);
+        log.info("Da tao tai khoan '{}' thanh cong", username);
     }
 }

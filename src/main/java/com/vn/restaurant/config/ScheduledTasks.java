@@ -24,7 +24,7 @@ public class ScheduledTasks {
     public void cleanupExpiredRefreshTokens() {
         int deletedCount = refreshTokenRepository.deleteAllExpiredBefore(Instant.now());
         if (deletedCount > 0) {
-            log.info("Đã xoá {} refresh token hết hạn", deletedCount);
+            log.info("Da xoa {} refresh token het han", deletedCount);
         }
     }
 }

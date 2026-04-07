@@ -61,7 +61,7 @@ public class SecurityConfig {
             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
             response.setCharacterEncoding("UTF-8");
 
-            ApiRes<Void> body = ApiRes.unauthorized("Token không hợp lệ hoặc đã hết hạn");
+            ApiRes<Void> body = ApiRes.unauthorized("Token khong hop le hoac da het han");
             response.getWriter().write(objectMapper.writeValueAsString(body));
         };
     }
@@ -73,7 +73,7 @@ public class SecurityConfig {
             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
             response.setCharacterEncoding("UTF-8");
 
-            ApiRes<Void> body = ApiRes.forbidden("Bạn không có quyền truy cập tài nguyên này");
+            ApiRes<Void> body = ApiRes.forbidden("Ban khong co quyen truy cap tai nguyen nay");
             response.getWriter().write(objectMapper.writeValueAsString(body));
         };
     }
